@@ -1,0 +1,100 @@
+plugins {
+    id 'org.springframework.boot' version '3.4.3'
+    id 'io.spring.dependency-management' version '1.1.5'
+    id 'java'
+    id 'jacoco'
+    id 'info.solidsoft.pitest' version '1.15.0'
+    id 'org.cyclonedx.bom' version '2.2.0'
+    id 'org.sonarqube' version '6.0.0.5145'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+
+
+java {
+    sourceCompatibility = '17'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    pitest 'org.example.pit.plugins:pitest-custom-plugin:0.42'
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+test {
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            element = 'BUNDLE'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.70
+            }
+            limit {
+                counter = 'BRANCH'
+                value = 'COVEREDRATIO'
+                minimum = 0.70
+            }
+        }
+    }
+}
+
+pitest {
+    targetClasses = ['com.example.customer.*']
+    threads = 4
+    outputFormats = ['HTML', 'XML']
+    timestampedReports = false
+    mutationThreshold = 70
+    coverageThreshold = 70
+}
+
+// SBOM Configuration with CycloneDX
+cyclonedxBom {
+    includeConfigs = ["runtimeClasspath", "compileClasspath"]
+    destination = file("$projectDir/sbom")
+    outputFormat = "all"
+    schemaVersion = "1.4"
+}
+
+// Custom task to run all quality checks
+task qualityCheck(dependsOn: ['test', 'jacocoTestCoverageVerification', 'pitest', 'cyclonedxBom']) {
+    group = 'verification'
+    description = 'Run all quality checks including tests, coverage, mutation testing, and SBOM generation'
+}
+
+bootJar {
+    archiveBaseName = 'customerapi'
+    archiveClassifier = ''
+}
+
+// Custom task to copy SBOM files to a dedicated directory
+task copySbomArtifacts(type: Copy, dependsOn: 'cyclonedxBom') {
+    from "$projectDir/sbom"
+    into "$projectDir/sbom-artifacts"
+}
+
+build {
+    dependsOn copySbomArtifacts
+}

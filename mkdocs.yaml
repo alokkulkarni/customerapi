@@ -1,0 +1,8 @@
+site_name: "customerapi"
+site_description: "customer api to retrieve customer data"
+
+nav:
+  - Introduction: index.md
+
+plugins:
+  - techdocs-core
